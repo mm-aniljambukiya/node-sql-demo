@@ -73,8 +73,7 @@ PWD={password};
 
 ssl_context = ssl._create_unverified_context()
 
-# ---------- MASTER FILE PATH ----------
-MASTER_FILE = r"C:\testdata\master.csv"
+# ---------- OUTPUT FOLDER ----------
 MASTER_JSON = r"C:\testdata\Ewing_Pharmacy_Patients.json"
 
 def process_pharmacy_data(pharmacy_name, pharmacy_id, conn):
@@ -168,43 +167,28 @@ def process_pharmacy_data(pharmacy_name, pharmacy_id, conn):
         new_df = new_df.drop_duplicates(keep="last")
         new_df = fix_datatypes(new_df)
         
-        # Save separate files for this pharmacy
         pharmacy_filename = pharmacy_name.replace(" ", "_").lower()
-        csv_file = os.path.join(folder, f"{pharmacy_filename}_data.csv")
         json_file = os.path.join(folder, f"{pharmacy_filename}_data.json")
         
-        # ============================================
-        # 🔄 MERGE WITH EXISTING DATA + REMOVE DUPLICATES
-        # ============================================
         print(f"  🔄 Checking for existing data...")
-        
-        if os.path.exists(csv_file):
-            # Load existing data
-            existing_df = pd.read_csv(csv_file, dtype=str)
-            print(f"  📁 Found existing file with {len(existing_df)} records")
-            
-            # Combine new + existing data
+        existing_df = None
+        if os.path.exists(json_file):
+            existing_df = pd.read_json(json_file)
+            existing_df = existing_df.astype(str).replace("nan", None)
+            print(f"  📁 Found existing JSON with {len(existing_df)} records")
+
+        if existing_df is not None:
             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
             print(f"  📊 Combined total: {len(combined_df)} records")
-            
-            # Remove duplicates (keep the last occurrence - newest data)
-            combined_df = combined_df.drop_duplicates(keep="last")
-            print(f"  ✂️  After removing duplicates: {len(combined_df)} records")
-            
-            merged_df = combined_df
+            merged_df = combined_df.drop_duplicates(keep="last")
+            print(f"  ✂️  After removing duplicates (all columns): {len(merged_df)} records")
         else:
             print(f"  ✨ New file (no existing data)")
-            merged_df = new_df
+            merged_df = new_df.drop_duplicates(keep="last")
         
-        # Apply datatype fixes
         merged_df = fix_datatypes(merged_df)
-        
-        # Save updated files
-        merged_df.to_csv(csv_file, index=False)
         merged_df.to_json(json_file, orient="records", indent=4)
-        
-        print(f"  ✅ Updated: {csv_file} ({len(merged_df)} total records)")
-        print(f"  ✅ Updated: {json_file}")
+        print(f"  ✅ Updated: {json_file} ({len(merged_df)} total records)")
 
 try:
     conn = pyodbc.connect(connection_string)
